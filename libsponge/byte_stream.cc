@@ -49,9 +49,9 @@ bool ByteStream::input_ended() const {return _end;}
 
 size_t ByteStream::buffer_size() const {return _data.size();}
 
-bool ByteStream::buffer_empty() const {return _data.size()==0&&_end==true;}
+bool ByteStream::buffer_empty() const {return _data.empty();}
 
-bool ByteStream::eof() const { return false; }
+bool ByteStream::eof() const { return _data.size()==0&&_end==true; }
 
 size_t ByteStream::bytes_written() const { return num_written; }
 
