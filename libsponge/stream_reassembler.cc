@@ -19,7 +19,11 @@ StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity),
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
+//! \param data the string being added
+//! \param index the index of the first byte in `data`
+//! \param eof whether or not this segment ends with the end of the stream
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
+    // data:abc, index:0, eof:0. all correct.
     // set end index and check if end input.
     // ofstream fout("./log.txt",ios::app);
     // fout<<"index: "<<index<<"; "<<data<<" "<<unassembled_bytes()<<endl;
@@ -29,12 +33,21 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     if(_output.input_ended()){return;}
     if(data.size()==0){return;}
     if(_end_idx<=index){return;}
-    if(index<_needed_idx&&index+data.size()<=_needed_idx){return;}
-    // available volume
-    size_t push_size=min(data.size(),_capacity-_output.buffer_size());
+    if(index+data.size()<=_needed_idx){return;}
+    // if(index<_needed_idx&&index+data.size()<=_needed_idx){return;}
+    // remaining buffer space
+    // modify the data
+    string inserting_str=data;
+    size_t idx=index; // 'idx' is the index of first char in inserting substring. So 'idx' may not be const.
+    // cut `data` overlaped by bytestream (overlapped prefix of `data`)
+    if(index<_needed_idx){
+        idx=_needed_idx;
+        inserting_str=inserting_str.substr(_needed_idx-index);
+    }
+    size_t push_size=min(inserting_str.size(),_capacity-_output.buffer_size());
     push_size=min(push_size,_end_idx-index);
-    size_t idx=index; // 'idx' is the index of first char in inserting substring. The inserting substring may extend. So 'idx' may not be const.
-    string inserting_str(data.begin(),data.begin()+push_size);
+    inserting_str=inserting_str.substr(0,push_size);
+    cerr<<inserting_str.size()<<endl;
     if(unassembled_strings.empty()){
         insert_unassembled(idx,inserting_str);
         return;
@@ -78,7 +91,11 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     insert_unassembled(idx,inserting_str);
 }
 
+// remove all the unassembled substrings that are totally covered by `str`
+// insert `str`
+// write unassembled[`index`] into bytestream if `index` is not greater than _needed_idx, and remove unassembled[`index`] if neccessary.
 void StreamReassembler::insert_unassembled(const size_t index,const string& str){
+    // remove all the unassembled substrings that are totally covered by `str`
     while(!unassembled_strings.empty()){
         auto it=unassembled_strings.lower_bound(index);
         if(it!=unassembled_strings.end()&&it->first+it->second.size()<=index+str.size()){
@@ -86,7 +103,9 @@ void StreamReassembler::insert_unassembled(const size_t index,const string& str)
         }
         else{break;}
     }
+    // insert `str`
     unassembled_strings[index]=str;
+    // write unassembled[`index`] into bytestream if `index` is not greater than _needed_idx, and remove unassembled[`index`] if neccessary.
     if(index<=_needed_idx){
         if(_needed_idx<index+str.size()){
             _output.write(str.substr(_needed_idx-index));
