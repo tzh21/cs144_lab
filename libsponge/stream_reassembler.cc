@@ -23,10 +23,7 @@ StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity),
 //! \param index the index of the first byte in `data`
 //! \param eof whether or not this segment ends with the end of the stream
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    // data:abc, index:0, eof:0. all correct.
     // set end index and check if end input.
-    // ofstream fout("./log.txt",ios::app);
-    // fout<<"index: "<<index<<"; "<<data<<" "<<unassembled_bytes()<<endl;
     if(eof){_end_idx=index+data.size();}
     if(_end_idx<=_needed_idx){_output.end_input();}
     // trivial speed-up
@@ -34,9 +31,6 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     if(data.size()==0){return;}
     if(_end_idx<=index){return;}
     if(index+data.size()<=_needed_idx){return;}
-    // if(index<_needed_idx&&index+data.size()<=_needed_idx){return;}
-    // remaining buffer space
-    // modify the data
     string inserting_str=data;
     size_t idx=index; // 'idx' is the index of first char in inserting substring. So 'idx' may not be const.
     // cut `data` overlaped by bytestream (overlapped prefix of `data`)
@@ -58,7 +52,6 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         it--;
         const string& front_str=it->second;
         const size_t idx_end_front_str=it->first+it->second.size();
-        // cerr<<"range: "<<it->first<<" "<<it->second[0]<<" "<<idx_end_front_str<<" "<<idx<<endl;
         if(idx<=idx_end_front_str){
             if(idx<=idx_end_front_str){
                 inserting_str=front_str.substr(0,idx-it->first)+inserting_str;

@@ -27,7 +27,6 @@ bool TCPReceiver::segment_received(const TCPSegment &seg) {
     // push data into reassembler
     uint64_t abs_seqno=unwrap(header.seqno,_isn,_ackno);
     uint64_t stream_idx=abs_seqno-1+(header.syn==true);
-    // cerr<<seg.payload().copy()<<endl;
 
     // check if segment is accepted.
     // special case: empty segment
@@ -36,9 +35,7 @@ bool TCPReceiver::segment_received(const TCPSegment &seg) {
         else{return false;}
     }
     // special case: window size 0
-    // cerr<<"windows:"<<_capacity<<"|"<<_reassembler.stream_out().buffer_size()<<"|"<<_reassembler.stream_out().peek_output(2)<<endl;
     if(window_size()<=0){
-        // cerr<<"check times"<<endl;
         if(abs_seqno<=_ackno&&_ackno<abs_seqno+seg.length_in_sequence_space()){return true;}
         else{return false;}
     }
@@ -48,14 +45,7 @@ bool TCPReceiver::segment_received(const TCPSegment &seg) {
     }
     // seg:abc, stream_idx:0, fin:0. all correct.
     _reassembler.push_substring(seg.payload().copy(),stream_idx,header.fin);
-    // cerr<<_reassembler.stream_out().bytes_written()<<endl;
-    // cerr<<seg.length_in_sequence_space()<<endl;
-    // cerr<<window_size()<<endl;
-    // cerr<<_reassembler.unassembled_bytes()<<endl;
-    // cerr<<seg.length_in_sequence_space()<<"|"<<seg.payload().copy()<<endl;
     _ackno=1+_reassembler.stream_out().bytes_written();
-    // cerr<<_reassembler.stream_out().bytes_written()<<endl;
-    // cerr<<_reassembler.stream_out().peek_output(3)<<endl;
     if(_reassembler.stream_out().input_ended()){
         _ackno++;
     }
