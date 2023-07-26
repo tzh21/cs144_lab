@@ -37,8 +37,6 @@ void TCPSender::fill_window() {
         }
         const size_t payload_size=min(TCPConfig::MAX_PAYLOAD_SIZE,window_size-_bytes_in_flight-segment.header().syn);
         segment.payload()=Buffer(_stream.read(payload_size));
-        // string str=_stream.read(payload_size);
-        // segment.payload()=Buffer(move(str));
         if(!_fin_set&&_stream.eof()&&segment.payload().size()+_bytes_in_flight<window_size){
             segment.header().fin=true;
             _fin_set=true;

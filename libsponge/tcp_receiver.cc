@@ -11,7 +11,6 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 using namespace std;
 
 bool TCPReceiver::segment_received(const TCPSegment &seg) {
-    cerr<<"start"<<endl;
     // set SYN.
     const TCPHeader& header=seg.header();
     if(header.syn){
