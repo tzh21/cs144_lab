@@ -43,6 +43,7 @@ class TCPSender {
     // std::map<size_t,TCPSegment> _map_flight{};
     uint _timeout{UINT16_MAX};
     size_t _timer{0};
+    bool _timer_running=false;
     // size_t _recv_ackno{0}; // ackno of last receive
     void send_segment(TCPSegment& segment){
       segment.header().seqno=wrap(_next_seqno,_isn);
@@ -50,10 +51,10 @@ class TCPSender {
       _bytes_in_flight+=segment.length_in_sequence_space();
       _segments_out.push(segment);
       _queue_flight.push(segment);
-    }
-    void reset_timer(){
-      _timer=0;
-      _timeout=_initial_retransmission_timeout;
+      if(!_timer_running){
+        _timer=0;
+        _timer_running=true;
+      }
     }
 
   public:

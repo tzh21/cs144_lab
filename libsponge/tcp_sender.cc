@@ -36,14 +36,14 @@ void TCPSender::fill_window() {
             return;
         }
         const size_t payload_size=min(TCPConfig::MAX_PAYLOAD_SIZE,window_size-_bytes_in_flight-segment.header().syn);
-        string str=_stream.read(payload_size);
-        segment.payload()=Buffer(move(str));
+        segment.payload()=Buffer(_stream.read(payload_size));
+        // string str=_stream.read(payload_size);
+        // segment.payload()=Buffer(move(str));
         if(!_fin_set&&_stream.eof()&&segment.payload().size()+_bytes_in_flight<window_size){
             segment.header().fin=true;
             _fin_set=true;
         }
         if(segment.length_in_sequence_space()==0){break;}
-        if(_queue_flight.empty()){reset_timer();}
         send_segment(segment);
         if(segment.header().fin){break;}
     }
@@ -55,8 +55,6 @@ void TCPSender::fill_window() {
 bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
     uint64_t abs_seqno_ack=unwrap(ackno,_isn,_next_seqno);
     if(_next_seqno<abs_seqno_ack){return false;}
-    // if(abs_seqno_ack<=_recv_ackno){return true;}
-    // _recv_ackno=abs_seqno_ack;
     while(!_queue_flight.empty()){
         const TCPSegment& segment=_queue_flight.front();
         uint64_t abs_seqno_flight=unwrap(segment.header().seqno,_isn,_next_seqno);
@@ -68,7 +66,10 @@ bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
             break;
         }
     }
+    _timeout=_initial_retransmission_timeout;
     _consecutive_retransmissions_count=0;
+    _timer=0;
+    _timer_running=_queue_flight.empty()?false:true;
     _last_window_size=window_size;
     fill_window();
     return true;
@@ -76,16 +77,19 @@ bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) {
+    if(_timer_running==false){return;}
     _timer+=ms_since_last_tick;
     if(!_queue_flight.empty()&&_timeout<=_timer){
         if(_last_window_size>0){
             _timeout*=2;
         }
+        _consecutive_retransmissions_count++;
         _timer=0;
+        _timer_running=true;
         const TCPSegment& segment=_queue_flight.front();
         _segments_out.push(segment);
-        _consecutive_retransmissions_count++;
     }
+    else if(_queue_flight.empty()){_timer_running=false;}
 }
 
 unsigned int TCPSender::consecutive_retransmissions() const { return _consecutive_retransmissions_count; }
