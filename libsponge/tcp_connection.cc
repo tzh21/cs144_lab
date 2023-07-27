@@ -21,6 +21,7 @@ size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_b
 size_t TCPConnection::time_since_last_segment_received() const { return _time_since_last_segment_received; }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
+    if(!_active){return;}
     _time_since_last_segment_received=0;
     _receiver.segment_received(seg);
     // if RST, shutdown 
@@ -31,7 +32,12 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     // if ACK
     bool send_empty_ack=(seg.length_in_sequence_space()!=0);
     if(seg.header().ack){
-        _sender.ack_received(seg.header().ackno,seg.header().win);
+        bool accept_ack=_sender.ack_received(seg.header().ackno,seg.header().win);
+        if(!accept_ack){
+            if(_sender.next_seqno().raw_value()<seg.header().ackno.raw_value()){
+                send_empty_ack=true;
+            }
+        }
         if(send_empty_ack && !_sender.segments_out().empty()){
             send_empty_ack=false;
         }
