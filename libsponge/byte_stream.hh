@@ -17,8 +17,10 @@ class ByteStream {
   private:
     // Your code here -- add private members as necessary.
 
+    // 错误状态
     bool _error{};  //!< Flag indicating that the stream suffered an error.
     std::deque<char> _data{};
+    // 输入结束状态
     bool _end{};
     size_t num_written{};
     size_t num_popped{};
@@ -77,6 +79,7 @@ class ByteStream {
     bool buffer_empty() const;
 
     //! \returns `true` if the output has reached the ending
+    // 不能继续读取，等价于输入结束，且缓存区为空。
     bool eof() const;
     //!@}
 

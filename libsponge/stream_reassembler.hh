@@ -18,14 +18,17 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+
     // my code
     std::map<size_t,std::string> unassembled_strings{};
+    // 组装所需的下一个字符的绝对序列号（从0计数）
     size_t _needed_idx=0;
     size_t _end_idx=INT32_MAX;
-    // remove all the unassembled substrings that are totally covered by `str`
-    // insert `str`
+    // remove all the unassembled substrings that are totally covered by `str`.
+    // insert `str`.
     // write unassembled[`index`] into bytestream if `index` is not greater than _needed_idx, and remove unassembled[`index`] if neccessary.
-    void insert_unassembled(size_t index,const std::string& str);
+    // void insert_unassembled(size_t index,const std::string& str);
+    void write(const std::string& data);
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -48,8 +51,11 @@ class StreamReassembler {
     //! \name Access the reassembled byte stream
     //!@{
     const ByteStream &stream_out() const { return _output; }
+    // this function violates encapsulation principle
     ByteStream &stream_out() { return _output; }
     //!@}
+    //! Read (i.e., copy and then pop) as much as the next "len" bytes of the stream.
+    string read(const size_t len){return _output.read(len);}
 
     //! The number of bytes in the substrings stored but not yet reassembled
     //!

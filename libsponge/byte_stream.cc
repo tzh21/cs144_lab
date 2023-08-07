@@ -18,6 +18,7 @@ using namespace std;
 
 ByteStream::ByteStream(const size_t capacity):_capacity(capacity) {}
 
+// 超出capacity的data会被截断输入
 size_t ByteStream::write(const string &data) {
     if(_end){return 0;}
     size_t write_len=min(_capacity-_data.size(),data.size());

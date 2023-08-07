@@ -90,6 +90,8 @@
         "stacktrace": "cpp",
         "stdfloat": "cpp",
         "stop_token": "cpp",
-        "syncstream": "cpp"
-    }
+        "syncstream": "cpp",
+        "ciso646": "cpp"
+    },
+    "C_Cpp.default.compilerPath": "/usr/bin/g++-11"
 }

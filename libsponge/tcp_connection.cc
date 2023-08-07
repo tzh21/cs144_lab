@@ -23,23 +23,45 @@ size_t TCPConnection::time_since_last_segment_received() const { return _time_si
 void TCPConnection::segment_received(const TCPSegment &seg) {
     if(!_active){return;}
     _time_since_last_segment_received=0;
+    string sender_old_state=TCPState::state_summary(_sender);
     _receiver.segment_received(seg);
     // if RST, shutdown 
     if(seg.header().rst){
         set_rst(false);
         return;
     }
-    // if ACK
     bool send_empty_ack=(seg.length_in_sequence_space()!=0);
+    // if SYN
+    // if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::LISTEN&&
+    // seg.header().syn){
+    //     _sender.send_empty_segment();
+    //     update_ack_win();
+    //     return;
+    // }
+    // if ACK
     if(seg.header().ack){
         bool accept_ack=_sender.ack_received(seg.header().ackno,seg.header().win);
-        if(!accept_ack){
-            if(_sender.next_seqno().raw_value()<seg.header().ackno.raw_value()){
-                send_empty_ack=true;
+        if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::LISTEN){
+            send_empty_ack=false;
+        }
+        // else if(sender_old_state==TCPSenderStateSummary::SYN_SENT&&
+        // TCPState::state_summary(_sender)==TCPSenderStateSummary::SYN_ACKED){
+        //     send_empty_ack=true;
+        // }
+        else{
+            if(!accept_ack){
+                if(_sender.next_seqno().raw_value()<seg.header().ackno.raw_value()){
+                    send_empty_ack=true;
+                }
+            }
+            if(send_empty_ack && !_sender.segments_out().empty()){
+                send_empty_ack=false;
             }
         }
-        if(send_empty_ack && !_sender.segments_out().empty()){
-            send_empty_ack=false;
+    }
+    else{
+        if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::LISTEN){
+            return;
         }
     }
     if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::SYN_RECV&&
