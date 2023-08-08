@@ -55,7 +55,7 @@ class StreamReassembler {
     ByteStream &stream_out() { return _output; }
     //!@}
     //! Read (i.e., copy and then pop) as much as the next "len" bytes of the stream.
-    string read(const size_t len){return _output.read(len);}
+    std::string read(const size_t len){return _output.read(len);}
 
     //! The number of bytes in the substrings stored but not yet reassembled
     //!

@@ -27,71 +27,93 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     size_t idx_data_head=index;
     size_t idx_data_end=index+data.size();
     string insert_data=data;
-    // 若data完全为已组装数据：return
+    
+    // 若data完全为已组装数据：
     if(idx_data_end<=_needed_idx){
+        if(idx_data_end==_needed_idx&&!_output.input_ended()&&eof){
+            _output.end_input();
+        }
         return;
     }
 
-    // 设置结束状态
-    if(!_output.input_ended()&&eof){
-        _output.end_input();}
+    // 设置结束下标
+    if(eof){
+        _end_idx=index+data.size();
+    }
 
     // 去除data与已组装数据的重叠
     if(idx_data_head<_needed_idx){
         insert_data=insert_data.substr(_needed_idx-idx_data_head);
+        idx_data_head=_needed_idx;
     }
 
-    // 插入unassembled中，同时清除unassembled中的重叠
-    // data头部扩展
-    // 若无unassembled：直接插入
-    if(unassembled_strings.empty()){
-        if(insert_data.empty()){unassembled_strings[idx_data_head]=insert_data;}
+    // 去除data超出容量的部分
+    insert_data=insert_data.substr(0,_capacity-_output.buffer_size());
+    idx_data_end=idx_data_head+insert_data.size();
+
+    // data被unassembled完全覆盖
+    if(!unassembled_strings.empty()){
+        auto it=unassembled_strings.upper_bound(idx_data_head);
+        if(it!=unassembled_strings.begin()){
+            it--;
+            const size_t idx_prev_head=it->first;
+            const size_t idx_prev_end=idx_prev_head+it->second.size();
+            if(idx_data_end<=idx_prev_end){
+                return;
+            }
+        }
     }
-    // 若有unassembled：扩展，去重，插入
-    else{
+
+    // 扩展data头部
+    if(!unassembled_strings.empty()){
         auto it=unassembled_strings.lower_bound(idx_data_head);
         if(it!=unassembled_strings.begin()){
             it--;
             const size_t idx_prev_head=it->first;
-            const size_t idx_prev_end=idx_data_head+it->second.size();
+            const size_t idx_prev_end=idx_prev_head+it->second.size();
             // 扩展data头部
-            if(idx_data_head<=idx_prev_end){
+            if(idx_prev_head<idx_data_head&&idx_data_head<=idx_prev_end){
                 insert_data=it->second.substr(0,idx_data_head-idx_prev_head)+insert_data;
                 idx_data_head=idx_prev_head;
-                unassembled_strings.erase(idx_prev_head);
+                // unassembled_strings.erase(idx_prev_head);
+                unassembled_strings.erase(it);
             }
         }
-        // data尾部扩展
-        // 若无unassembled：直接插入
-        if(unassembled_strings.empty()){
-            if(insert_data.empty()){
-                unassembled_strings[idx_data_head]=insert_data;
+    }
+
+    // 扩展data尾部
+    if(!unassembled_strings.empty()){
+        auto it=unassembled_strings.upper_bound(idx_data_end);
+        if(it!=unassembled_strings.begin()){
+            it--;
+            const size_t idx_succ_head=it->first;
+            const size_t idx_succ_end=idx_succ_head+it->second.size();
+            // 扩展尾部
+            if(idx_succ_head<=idx_data_end&&idx_data_end<idx_succ_end){
+                insert_data+=it->second.substr(idx_data_end-idx_succ_head);
+                idx_data_end=idx_succ_end;
+                // unassembled_strings.erase(idx_succ_head);
+                unassembled_strings.erase(it);
             }
         }
-        // 若有：扩展
+    }
+
+    // 去除unassembled中被data完全覆盖的部分
+    while(!unassembled_strings.empty()){
+        auto it=unassembled_strings.lower_bound(idx_data_head);
+        if(it==unassembled_strings.end()){break;}
+        const size_t idx_cover_head=it->first;
+        const size_t idx_cover_end=idx_cover_head+it->second.size();
+        if(idx_cover_end<=idx_data_end){
+            unassembled_strings.erase(idx_cover_head);
+        }
         else{
-            it=unassembled_strings.upper_bound(idx_data_end);
-            if(it!=unassembled_strings.begin()){
-                it--;
-                const size_t idx_succ_head=it->first;
-                const size_t idx_succ_end=idx_succ_head+it->second.size();
-                if(idx_data_end<idx_succ_end){
-                    insert_data+=data.substr(idx_data_end-idx_succ_head);
-                    idx_data_end=idx_succ_end;
-                    unassembled_strings.erase(idx_succ_head);
-                }
-            }
-            // 去除可能的覆盖部分
-            while(!unassembled_strings.empty()){
-                it=unassembled_strings.lower_bound(idx_data_head);
-                if(it==unassembled_strings.end()){break;}
-                const size_t idx_cover_head=it->first;
-                const size_t idx_cover_end=idx_cover_head+it->second.size();
-                if(idx_cover_end<=idx_data_end){
-                    unassembled_strings.erase(idx_cover_head);
-                }
-            }
+            break;
         }
+    }
+
+    // 插入data
+    if(!insert_data.empty()){
         unassembled_strings[idx_data_head]=insert_data;
     }
 
@@ -99,8 +121,19 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     auto it=unassembled_strings.lower_bound(_needed_idx);
     if(it!=unassembled_strings.end()){
         if(it->first==_needed_idx){
-            write(it->second);
+            // 满足组装条件，组装。
+            // 同时判断是否结束输入。只有在成功组装时需要考虑。
+            string assembling_string=it->second;
+            bool reach_end=false;
+            if(_end_idx<=it->first+assembling_string.size()){
+                reach_end=true;
+                assembling_string=assembling_string.substr(0,_end_idx-it->first);
+            }
+            write(assembling_string);
             unassembled_strings.erase(it->first);
+            if(reach_end){
+                _output.end_input();
+            }
         }
     }
 }
