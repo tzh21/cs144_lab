@@ -24,13 +24,19 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     if(!_active){return;}
     _time_since_last_segment_received=0;
     string sender_old_state=TCPState::state_summary(_sender);
-    _receiver.segment_received(seg);
+    const bool seg_recv=_receiver.segment_received(seg);
     // if RST, shutdown 
     if(seg.header().rst){
         set_rst(false);
         return;
     }
-    bool send_empty_ack=(seg.length_in_sequence_space()!=0);
+    bool send_empty_ack=false;
+    if(seg.length_in_sequence_space()>0){
+        send_empty_ack=true;
+    }
+    if(!seg_recv){
+        send_empty_ack=true;
+    }
     // if SYN
     // if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::LISTEN&&
     // seg.header().syn){
