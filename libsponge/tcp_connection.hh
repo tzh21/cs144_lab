@@ -26,6 +26,7 @@ class TCPConnection {
     bool _active{true};
     void update_ack_win();
     void set_rst(bool send_rst);
+    void fill_window();
 
   public:
     //! \name "Input" interface for the writer
