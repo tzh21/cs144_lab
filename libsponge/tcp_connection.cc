@@ -28,21 +28,43 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     _time_since_last_segment_received=0;
 
     string sender_old_state=TCPState::state_summary(_sender);
-    
-    const bool seg_recv=_receiver.segment_received(seg);
-    
-    // if RST, shutdown 
+
+    // 收到RST，立刻关闭。
     if(seg.header().rst){
         set_rst(false);
         return;
     }
     
-    // 判断是否发送空段，即维护send_empty_ack
-    bool send_empty=false;
+    // receiver解析
+    const bool seg_recv=_receiver.segment_received(seg);
+
+    // sender解析
     bool accept_ack=false;
     if(seg.header().ack){
         accept_ack=_sender.ack_received(seg.header().ackno,seg.header().win);
     }
+    
+    // receiver和sender的状态已更新（调用了segment_received和ack_received）。执行一些特判。
+    if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::SYN_RECV&&
+    TCPState::state_summary(_sender)==TCPSenderStateSummary::CLOSED){
+        connect();
+        return;
+    }
+    // 接收到对方的FIN，但自己的FIN未确定被接收，则需要等待。
+    if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::FIN_RECV&&
+    TCPState::state_summary(_sender) == TCPSenderStateSummary::SYN_ACKED){
+        _linger_after_streams_finish = false;
+    }
+    // 接收到对方的FIN，且自己的FIN已经被接收，则立刻关闭。
+    if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::FIN_RECV&&
+    TCPState::state_summary(_sender) == TCPSenderStateSummary::FIN_ACKED&&
+    !_linger_after_streams_finish){
+        _active = false;
+        return;
+    }
+
+    // 判断是否发送空段
+    bool send_empty=false;
     if(_sender.segments_out().empty()&&TCPState::state_summary(_receiver)!=TCPReceiverStateSummary::LISTEN){
         if(seg.length_in_sequence_space()>0){
             send_empty=true;
@@ -58,29 +80,11 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             }
         }
     }
-
-    // receiver和sender的状态已更新（调用了segment_received和ack_received）。执行一些特判。
-    if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::SYN_RECV&&
-    TCPState::state_summary(_sender)==TCPSenderStateSummary::CLOSED){
-        connect();
-        return;
-    }
-    if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::FIN_RECV&&
-    TCPState::state_summary(_sender) == TCPSenderStateSummary::SYN_ACKED){
-        _linger_after_streams_finish = false;
-    }
-    if(TCPState::state_summary(_receiver)==TCPReceiverStateSummary::FIN_RECV&&
-    TCPState::state_summary(_sender) == TCPSenderStateSummary::FIN_ACKED&&
-    !_linger_after_streams_finish){
-        _active = false;
-        return;
-    }
-
     if(send_empty){
         _sender.send_empty_segment();
     }
 
-    // in most cases, ackno and win are needed in segments sent.
+    // 包装并发送sender中待发送的字段
     update_ack_win();
 }
 

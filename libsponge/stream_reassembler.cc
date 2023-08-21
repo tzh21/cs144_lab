@@ -22,13 +22,27 @@ StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity),
 //! \param data the string being added
 //! \param index the index of the first byte in `data`
 //! \param eof whether or not this segment ends with the end of the stream
-// 
+// data和index在实际意义上有联系，但并不内聚，如data为空时，data和index的联系没有定义。
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
+    // 空数据只可能起结束作用。
+    if(data.size()==0){
+        // 结束
+        if(eof&&_needed_idx==index){
+            _output.end_input();
+        }
+        return;
+    }
+
     size_t idx_data_head=index;
     size_t idx_data_end=index+data.size();
     string insert_data=data;
-    
-    // 若data完全为已组装数据：
+
+    // 设置结束下标
+    if(eof){
+        _end_idx=idx_data_end;
+    }
+
+    // 若data完全为已组装数据
     if(idx_data_end<=_needed_idx){
         if(idx_data_end==_needed_idx&&!_output.input_ended()&&eof){
             _output.end_input();
@@ -36,9 +50,9 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         return;
     }
 
-    // 设置结束下标
-    if(eof){
-        _end_idx=index+data.size();
+    // 若data完全在窗口外
+    if(_needed_idx+_capacity-_output.buffer_size()<=idx_data_head){
+        return;
     }
 
     // 去除data与已组装数据的重叠
