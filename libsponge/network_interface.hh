@@ -7,6 +7,8 @@
 
 #include <optional>
 #include <queue>
+#include <map>
+#include <list>
 
 //! \brief A "network interface" that connects IP (the internet layer, or network layer)
 //! with Ethernet (the network access layer, or link layer).
@@ -39,6 +41,32 @@ class NetworkInterface {
 
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
+
+    // MY CODE
+    
+    const size_t _ARP_RESPONSE_TTL=5*1000;
+
+    const size_t _ARP_ENTRY_TTL=30*1000;
+
+    struct ARP_entry{
+      EthernetAddress addr;
+      size_t ttl;
+    };
+
+    // ip-mac表
+    // 向某个ip发送时数据时，首先在表中查询mac地址
+    std::map<uint32_t,ARP_entry> _ARP_table{};
+
+    // 正在广播查询的ARP
+    // 键：ip地址，值：等待时间
+    std::map<uint32_t,size_t> _outgoing_ARP{};
+    
+    // 因未知mac而暂存的待发送字段
+    // 键：ip地址，值：字段内容
+    // 有大量发送到同一ip的字段。用list效率更高。
+    std::list<std::pair<Address,InternetDatagram>> _datagrams_to_send{};
+    // std::list<std::pair<uint32_t,InternetDatagram>> _datagrams_to_send{};
+    // std::map<uint32_t,InternetDatagram> _datagrams_to_send{};
 
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses
